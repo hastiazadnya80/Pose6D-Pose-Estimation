@@ -1,0 +1,9 @@
+Install the following python-libraries:
+
+- Python 3.x
+- PyTorch
+- NumPy
+- Matplotlib
+- OpenCV
+- tqdm
+- ultralytics
