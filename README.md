@@ -1,7 +1,4 @@
-
-# Pose6D: 6D Object Pose Estimation via YOLOv8 and PoseNet
-End-to-end 6D object pose estimation pipeline combining YOLOv8 (99.6% precision) with a PoseNet-inspired RGB-D regression network. Achieves 17% accuracy improvement over RGB-only baseline on the LineMOD dataset.
-
+# Pose6D: 6D Object Pose Estimation from RGB-D Images
 
 <p align="center">
   <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white"/>
@@ -10,42 +7,40 @@ End-to-end 6D object pose estimation pipeline combining YOLOv8 (99.6% precision)
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square"/>
 </p>
 
-This repository contains the implementation of an end-to-end pipeline for **6D object pose estimation** from RGB-D images, developed as part of a graduate course project at Politecnico di Torino. The pipeline integrates a fine-tuned YOLOv8 detector for 2D object localization with a PoseNet-inspired network for direct regression of 3D translation and rotation.
+This project estimates the full **6D pose** — 3D rotation and 3D translation — of objects from RGB and RGB-D images. The pipeline combines **YOLOv8-based object detection** with a **PoseNet-inspired pose regression network**, evaluated on the LineMOD benchmark. Potential applications include robotics manipulation, augmented reality, and object tracking.
 
-Two model variants are implemented and evaluated on the **LineMOD** dataset using the ADD metric: an RGB-only baseline and an RGB-D extension incorporating depth fusion, achieving a **17% improvement** in pose accuracy over the baseline.
-
-A full technical description of the methodology is available in [Report.pdf](Report.pdf).
+> Full methodology and experimental analysis: [Report.pdf](Report.pdf)
 
 ---
 
-## Method
+## Overview
 
-The pipeline consists of two sequential modules:
+Estimating an object's 6D pose from a single image is a core challenge in computer vision with direct applications in robotic grasping, AR scene understanding, and autonomous navigation. This project implements a modular two-stage pipeline:
 
-**1. Object Detection** — A YOLOv8-nano model fine-tuned on LineMOD detects and localizes objects in RGB frames, producing bounding boxes and class labels used to crop object regions for the downstream estimator.
+1. **Object Detection** — YOLOv8-nano fine-tuned on LineMOD performs real-time 2D localization, producing tight bounding boxes and class labels for each object in the scene.
 
-**2. Pose Estimation** — Two regression networks predict the 6D pose (quaternion `q̂` + depth `Ẑ`) from cropped regions:
-- `PoseNet6D`: ResNet-18 backbone on RGB crops, with object ID embedding and bounding box features fed into a pose regression head.
-- `PoseNet6D_RGBD`: Extends the above with a parallel depth CNN branch; RGB and depth features are fused via channel-wise concatenation and a 1×1 convolution before regression. Ground-truth segmentation masks are applied externally during training to suppress background.
-
-Translation is recovered by back-projecting the predicted depth through the cropped intrinsic matrix `K_crop`. Rotation is represented as an ℓ₂-normalized quaternion. The training objective combines weighted MSE for translation (with log-transform on the Z-axis) and a quaternion dot-product loss for rotation.
+2. **Pose Regression** — Cropped object regions are passed to one of two pose estimators:
+   - **PoseNet6D** (RGB): A ResNet-18 backbone extracts visual features, combined with a learnable object ID embedding and normalized bounding box coordinates. The regression head predicts a unit quaternion for rotation and a scalar depth for translation, back-projected to 3D via the cropped intrinsic matrix `K_crop`.
+   - **PoseNet6D_RGBD** (RGB + Depth): Extends the above with a parallel depth CNN branch. RGB and depth features are fused through channel-wise concatenation and a 1×1 convolution. Segmentation masks suppress background during training, and Gaussian blur is applied to depth inputs for noise reduction.
 
 ---
 
 ## Results
 
-**Object Detection (YOLOv8 on LineMOD test set)**
+**Detection — YOLOv8 on LineMOD (test set)**
 
 | Precision | Recall | mAP@50 | mAP@50-95 |
 |:---------:|:------:|:------:|:---------:|
 | 99.6% | 99.1% | 99.2% | 91.3% |
 
-**Pose Estimation (ADD metric, lower is better)**
+**Pose Estimation — ADD metric (lower is better)**
 
-| Model | Input | ADD (m) |
-|-------|-------|:-------:|
+| Model | Modality | ADD (m) |
+|-------|----------|:-------:|
 | PoseNet6D | RGB | 0.095 |
 | PoseNet6D_RGBD | RGB + Depth | **0.0795** |
+
+Incorporating depth information yields a **~17% reduction in average pose error**, with the most notable gains on symmetric and low-texture objects such as glue and eggbox.
 
 ---
 
@@ -56,7 +51,7 @@ Translation is recovered by back-projecting the predicted depth through the crop
 │   └── yolo_conversion_steps.ipynb   # LineMOD → YOLO format conversion
 ├── models/
 │   ├── YOLO_training.ipynb           # YOLOv8 fine-tuning
-│   ├── training_RGB.ipynb            # PoseNet6D training
+│   ├── training_RGB.ipynb            # PoseNet6D (RGB) training
 │   ├── training_RGBD.ipynb           # PoseNet6D_RGBD training
 │   ├── tryModel_RGB.ipynb            # RGB inference & evaluation
 │   └── tryModel_RGBD.ipynb           # RGB-D inference & evaluation
@@ -67,19 +62,22 @@ Translation is recovered by back-projecting the predicted depth through the crop
 
 ---
 
-## Setup & Usage
+## Setup
 
 ```bash
 pip install torch torchvision opencv-python numpy matplotlib tqdm ultralytics scipy pillow scikit-image
 ```
 
-Run the notebooks in order: dataset conversion → YOLO training → pose training → evaluation. Notebooks are compatible with both local Jupyter and Google Colab environments.
+Run notebooks in order: dataset conversion → detection training → pose training → evaluation.
+Compatible with local Jupyter and Google Colab (mount Drive and update paths to `/content/`).
 
-> **Model weights** are not included due to GitHub's file size limit. Request via Issues or email.
+**Required files for inference:** `yolo.pt`, `posenet6d_RGB.pt`, `posenet6d_RGBD.pt`
+
+> Trained weights exceed GitHub's file size limit and are not included. Open an Issue or contact the authors to request them.
 
 ---
 
 ## Authors
 
 Hasti Azadnia · Elias Noorzad · Ayda Ghasemazar · Filip Nykvist  
-*MSc Data Science & Engineering, Politecnico di Torino*
+*MSc Data Science & Engineering — Politecnico di Torino*
